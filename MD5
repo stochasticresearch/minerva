@@ -1,0 +1,14 @@
+70474ee55b717fa99d3cecc21069af09 *DESCRIPTION
+2093849c4572eef13545a5c634d20dae *NAMESPACE
+b4253bb176267110ed597dde398a3041 *R/mine.R
+9e8021fcc6be5a3a1768c8caabc0ca5b *data/Spellman.csv.gz
+d32239bcb673463ab874e80d47fae504 *gpl-3.0.txt
+80d1985f175f55db1c281a9a1f8ac50b *man/Spellman.Rd
+cc25a70a340668719b642da47048e619 *man/mine.Rd
+5153984a57f35dbc814e5a856ca5c85e *man/minerva-package.Rd
+18c63c10f7b29a5e9139a011768935cc *src/core.c
+75d844841e3e3fe8452028e121619bdc *src/core.h
+5365c4d3d7a9fa6bebdadb27bbbbab70 *src/mine.c
+c89ae8fdbd784fb225fb5a706c9b9558 *src/mine.h
+b7c9e0a0d059ad8b6ac195287821e6de *src/mine_interface.c
+a147fe6d6e1d70e9c25cb6bf5225f8f4 *tests/testspellman0.R

@@ -1,0 +1,10 @@
+## Using C API code for mine computation throuth mine_interfaces.c
+useDynLib(minerva)
+
+## Export only the needed functions
+export(mine)
+
+
+## Import support for parallel computing
+if (as.numeric(R.version$major)>=2 && as.numeric(R.version$minor)>=14.0)
+  import(parallel)
