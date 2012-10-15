@@ -1,6 +1,6 @@
 /*  
     This code is written by Davide Albanese <davide.albanese@gmail.com>.
-    (C) 2012 Davide Albanese.
+    (C) 2012 Davide Albanese, (C) 2012 Fondazione Bruno Kessler.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,13 +18,17 @@
 
 #include <stdlib.h>
 #include <math.h>
+#include <stdio.h>
 #include "core.h"
 #include "mine.h"
+
 
 #define MAX(a, b) ((a) > (b) ? (a):(b))
 #define MIN(a, b) ((a) < (b) ? (a):(b))
 
-
+/* Computes the maximum normalized mutual information scores 
+ * and returns a mine_score structure.
+ */
 mine_score *mine_compute_score(mine_problem *prob, mine_parameter *param)
 {
   int i, j, q, p;
@@ -40,7 +44,8 @@ mine_score *mine_compute_score(mine_problem *prob, mine_parameter *param)
   
   score = (mine_score *) malloc (sizeof(mine_score));
   score->m = 0;
-  score->p = NULL; // x-1 for each y
+  /* x-1 for each y */
+  score->p = NULL;
   score->I = NULL;
   Gy = NULL;
 
@@ -52,7 +57,7 @@ mine_score *mine_compute_score(mine_problem *prob, mine_parameter *param)
   Gy = (int *) malloc (score->m * sizeof(int));
   for (gy=2; gy<Gy_max+1; gy++)
     {
-      gx = floor(B / gy);
+      gx = (int) floor(B / gy);
       if ((gx * gy) <= B)
 	{
 	  score->p[gy-2] = gx-1;
@@ -90,14 +95,14 @@ mine_score *mine_compute_score(mine_problem *prob, mine_parameter *param)
   Qm_s = (int *) malloc (prob->n * sizeof(int));
   Pm_s = (int *) malloc (prob->n * sizeof(int));
   
-  // x vs. y
+  /* x vs. y */
   for (i=0; i<score->m; i++)
     {
       score->I[i] = (double *) malloc ((score->p[i]) * sizeof(double));
-      k = MAX((int) (param->c * score->p[i]+1), 1);
+      k = MAX((int) (param->c * (score->p[i]+1)), 1);
       
       q = EquipartitionYAxis(y_y, prob->n, Gy[i], Qm_s);
-      
+
       for (j=0; j<prob->n; j++)
 	Qm[idx_y[j]] = Qm_s[j];
       
@@ -110,11 +115,11 @@ mine_score *mine_compute_score(mine_problem *prob, mine_parameter *param)
 			  score->p[i]+1, score->I[i]);
     }
   
-  // y vs. x
+  /* y vs. x */
   for (i=0; i<score->m; i++)
     {
       It = (double *) malloc ((score->p[i]) * sizeof(double));
-      k = MAX((int) (param->c * score->p[i]+1), 1);
+      k = MAX((int) (param->c * (score->p[i]+1)), 1);
       
       q = EquipartitionYAxis(x_x, prob->n, Gy[i], Qm_s);
       
@@ -125,7 +130,7 @@ mine_score *mine_compute_score(mine_problem *prob, mine_parameter *param)
 	Qm_s[j] = Qm[idx_y[j]];
       
       p = GetSuperclumpsPartition(y_y, prob->n, Qm_s, k, Pm_s);
-       
+
       ApproxOptimizeXAxis(y_y, x_y, prob->n, Qm_s, q, Pm_s, p,
 			  score->p[i]+1, It);
 
@@ -149,7 +154,10 @@ mine_score *mine_compute_score(mine_problem *prob, mine_parameter *param)
   return score;
 }
 
-
+/* This function checks the parameters. It should be called 
+ * before calling mine_compute_score(). It returns NULL if 
+ * the parameters are feasible, otherwise an error message is returned.
+ */
 char *check_parameter(mine_parameter *param)
 {
   if ((param->alpha <= 0.0) || (param->alpha > 1.0))
@@ -161,7 +169,7 @@ char *check_parameter(mine_parameter *param)
   return NULL;
 }
 
- 
+/* Returns the Maximal Information Coefficient (MIC). */
 double mic(mine_score *score)
 {
   int i, j;
@@ -176,7 +184,7 @@ double mic(mine_score *score)
   return score_max;
 }
 
-
+/* Returns the Maximum Asymmetry Score (MAS). */
 double mas(mine_score *score)
 {
   int i, j;
@@ -194,7 +202,7 @@ double mas(mine_score *score)
   return score_max;
 }
 
-
+/* Returns the Maximum Edge Value (MEV). */
 double mev(mine_score *score)
 {
   int i, j;
@@ -209,7 +217,7 @@ double mev(mine_score *score)
    return score_max;
 }
 
-
+/* Returns the Minimum Cell Number (MCN). */
 double mcn(mine_score *score)
 {
   int i, j, b, b_max;
@@ -232,7 +240,9 @@ double mcn(mine_score *score)
   return log(b_max) / log(2.0);
 }
 
-  
+/* This function frees the memory used by a mine_score and 
+ *  destroys the score structure.
+ */
 void mine_free_score(mine_score **score)
 {
   int i;
