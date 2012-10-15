@@ -17,9 +17,9 @@
 Summary:
   \tabular{ll}{
   Package: \tab minerva\cr
-  Version: \tab 1.0\cr
-  Date: \tab 2012-08-01\cr
-  Require: \tab R >= (2.10.0)\cr
+  Version: \tab 1.1\cr
+  Date: \tab 2012-10-15\cr
+  Require: \tab R >= (2.14.0)\cr
   Enshances: \tab parallel\cr
   URL: \tab http://www.r-project.org, \cr
   \tab http://mpba.fbk.eu/cmine, \cr
@@ -39,7 +39,8 @@ Summary:
   Roberto Visintainer [aut],
   Davide Albanese [aut],
   Samantha Riccadonna [ctb],
-  Giuseppe Jurman [ctb]
+  Giuseppe Jurman [ctb],
+  Cesare Furlanello [ctb]
   
   Maintainer: Michele Filosi <filosi@fbk.eu>
 

@@ -1,6 +1,6 @@
 /*  
     This code is written by Davide Albanese <davide.albanese@gmail.com>.
-    (C) 2012 Davide Albanese.
+    (C) 2012 Davide Albanese, (C) 2012 Fondazione Bruno Kessler.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 #include <float.h>
 #include "core.h"
@@ -26,12 +27,25 @@
 #define MIN(a, b) ((a) < (b) ? (a):(b))
 
 
-/* computes H(Q) */
+/* HQ
+ * Returns the entropy induced by the points on the 
+ * partition Q.
+ * See section 3.2.1 at page 10 in SOM.
+ *
+ * Parameters
+ *   N : q x p matrix containing the number of points
+ *       for each cell of the grid formed by P and Q
+ *       partitions.
+ *   q : number of rows of N (number of partitions in Q)
+ *   p : number of cols of N (number of partitions in P)
+ *   n : total number of points
+ */
 double HQ(int **N, int q, int p, int n)
 {
   int i, j, sum;
   double prob, logprob, H;
 
+  
   H = 0.0;
   for (i=0; i<q; i++)
     {
@@ -51,7 +65,18 @@ double HQ(int **N, int q, int p, int n)
 }
 
 
-/* computes H(<c_0, c_s, c_t>) */
+/* HP3
+ * Returns the entropy induced by the points on the 
+ * partition <c_0, c_s, c_t>.
+ * See line 5 of Algorithm 2 in SOM.
+ *
+ * Parameters
+ *   np : p vector containing the number of points
+ *        for each cell of the grid formed by P
+ *   p : length of np (number of partitions in P)
+ *   s : s in c_s
+ *   t : t in c_t
+ */
 double HP3(int *np, int p, int s, int t)
 {
   int i;
@@ -86,7 +111,22 @@ double HP3(int *np, int p, int s, int t)
 }
 
 
-/* computes H(<c_0, c_s, c_t>, Q) */
+/* HPQ3
+ * Returns the entropy induced by the points on the 
+ * partition <c_0, c_s, c_t> and Q.
+ * See line 5 of Algorithm 2 in SOM.
+ *
+ * Parameters
+ *   N : q x p matrix containing the number of points
+ *       for each cell of the grid formed by P and Q
+ *       partitions.
+ *   np : p vector containing the number of points
+ *        for each cell of the grid formed by P
+ *   q : number of rows of N (number of partitions in Q)
+ *   p : number of cols of N and length of np (number of partitions in P)
+ *   s : s in c_s
+ *   t : t in c_t
+ */
 double HPQ3(int **N, int *np, int q, int p, int s, int t)
 {
   int i, j;
@@ -101,11 +141,11 @@ double HPQ3(int **N, int *np, int q, int p, int s, int t)
   H = 0.0;
   for (i=0; i<q; i++)
     {
-      sum1 = 0.0;
+      sum1 = 0;
       for (j=0; j<s; j++)
 	sum1 += N[i][j];
       
-      sum2 = 0.0;
+      sum2 = 0;
       for (j=s; j<t; j++)
 	sum2 += N[i][j];
       
@@ -123,12 +163,28 @@ double HPQ3(int **N, int *np, int q, int p, int s, int t)
 }
 
 
-/* computes H(<c_s, c_t>, Q) */
+/* HPQ2
+ * Returns the entropy induced by the points on the 
+ * partition <c_s, c_t> and Q.
+ * See line 13 of Algorithm 2 in SOM.
+ *
+ * Parameters
+ *   N : q x p matrix containing the number of points
+ *       for each cell of the grid formed by P and Q
+ *       partitions.
+ *   np : p vector containing the number of points
+ *        for each cell of the grid formed by P
+ *   q : number of rows of N (number of partitions in Q)
+ *   p : number of cols of N and length of np (number of partitions in P)
+ *   s : s in c_s
+ *   t : t in c_t
+ */
 double HPQ2(int **N, int *np, int q, int p, int s, int t)
 {
   int i, j;
   int sum, tot;
   double prob, H;
+  
   
   if (s == t)
     return 0.0;
@@ -140,7 +196,7 @@ double HPQ2(int **N, int *np, int q, int p, int s, int t)
   H = 0.0;
   for (i=0; i<q; i++)
     {
-      sum = 0.0;
+      sum = 0;
       for (j=s; j<t; j++)
 	sum += N[i][j];
       
@@ -154,9 +210,17 @@ double HPQ2(int **N, int *np, int q, int p, int s, int t)
 }
 
 
-/* Dy must be sorted in increasing order.
- * Qm must be a preallocated vector of size n.
- * Returns q.
+/* EquipartitionYAxis
+ * Returns the map Q: D -> {0, ...,y-1}. See Algorithm 3 in SOM.
+ * 
+ * Parameters
+ *   Dy (IN): y-data sorted in increasing order
+ *   n (IN): length of Dy
+ *   y (IN): an integer greater than 1
+ *   Qm (OUT): the map Q. Qm must be a preallocated vector 
+ *       of size n.
+ * Return
+ *   q : the real value of y. It can be < y.
  */
 int EquipartitionYAxis(double *Dy, int n, int y, int *Qm)
 {
@@ -199,24 +263,30 @@ int EquipartitionYAxis(double *Dy, int n, int y, int *Qm)
 }
 
 
-/* Dx and Qm must be sorted in increasing order by Dx-values.
- * Pm must be a preallocated vector of size n.
- * Returns p.
+/* GetClumpsPartition
+ * Returns the map P: D -> {0, ...,k-1}.
+ * 
+ * Parameters
+ *   Dx (IN) : x-data sorted in increasing order
+ *   n (IN) : length of Dx
+ *   Qm (IN) : the map Q computed by EquipartitionYAxis sorted in increasing 
+ *        order by Dx-values.
+ *   Pm (OUT) : the map P. Pm must be a preallocated vector of size n. 
+ * Return
+ *   k : number of clumps in Pm.
  */
-int GetSuperclumpsPartition(double *Dx, int n, int *Qm, int k, int *Pm)
+int GetClumpsPartition(double *Dx, int n, int *Qm, int *Pm)
 {
-  int i, j, s, h, b, flag, curr;
-  int *Qm_n, *Pm_c;
-  double colsize;
-
-  /* clumps */
+  int i, j, s, c, flag;
+  int *Qm_tilde;
   
-  Qm_n = (int *) malloc (n * sizeof(int));
+ 
+  Qm_tilde = (int *) malloc (n * sizeof(int));
   for(i=0; i<n; i++)
-    Qm_n[i] = Qm[i];
+    Qm_tilde[i] = Qm[i];
 
   i = 0;
-  b = -1; 
+  c = -1; 
   while (i < n)
     {
       s = 1;
@@ -225,7 +295,7 @@ int GetSuperclumpsPartition(double *Dx, int n, int *Qm, int k, int *Pm)
 	if (Dx[i] == Dx[j])
 	  {
 	    s++;
-	    if (Qm_n[i] != Qm_n[j])
+	    if (Qm_tilde[i] != Qm_tilde[j])
 	      flag = 1;
 	  }
 	else
@@ -234,101 +304,103 @@ int GetSuperclumpsPartition(double *Dx, int n, int *Qm, int k, int *Pm)
       if ((s > 1) && (flag == 1))
 	{
 	  for (j=0; j<s; j++)
-	    Qm_n[i+j] = b;
-	  b--;
+	    Qm_tilde[i+j] = c;
+	  c--;
 	}
       
       i += s;
     }
-
-  Pm_c = (int *) malloc (n * sizeof(int));
-  curr = 0;
-  Pm_c[0] = curr;
-  for (i=1; i<n; i++)
-    {
-      if (Qm_n[i] != Qm_n[i-1])
-	curr++;
-      Pm_c[i] = curr;
-    }
-  
-  free(Qm_n);
-  
-  if (k >= (curr + 1))
-    {
-      for (i=0; i<n; i++)
-	Pm[i] = Pm_c[i];
-      free(Pm_c);
-      return curr + 1; 
-    }
-  
-  /* superclumps*/
-
-  for (i=0; i<n; i++)
-    Pm[i] = -1;
   
   i = 0;
-  curr = 0;
-  colsize =  (double) n / (double) k;
-  while (i < n)
+  Pm[0] = i;
+  for (j=1; j<n; j++)
     {
-      s = 1;
-      for (j=i+1; j<n; j++)
-	if (Pm_c[i] == Pm_c[j])
-	  s++;
-	else
-	  break;
-
-      h = 0;
-      for (j=0; j<n; j++)
-	if (Pm[j] == curr)
-	  h++;
-      
-      if ((h != 0) && (fabs(h+s-colsize) >= fabs(h-colsize)))
-	{
-	  curr++;
-	  colsize = (double) (n-i) / (double) (k-curr);
-	}
-
-      for (j=0; j<s; j++)
-	Pm[i+j] = curr;
-      
-      i += s;
+      if (Qm_tilde[j] != Qm_tilde[j-1])
+	i++;
+      Pm[j] = i;
     }
-
-  free (Pm_c);
-  return curr + 1;
+  
+  free(Qm_tilde);
+  return i+1;
 }
 
 
-/*
- * Dx, Dy, Qm and Pm must be sorted in increasing order
- * by Dx-value.
- * I must be a preallocated array of dimension x-1.
- * It will contain I_{k,2}, ..., I_{k, x}.
+/* GetSuperclumpsPartition
+ * Returns the map P: D -> {0, ...,k-1}.
+ * 
+ * Parameters
+ *   Dx (IN) : x-data sorted in increasing order
+ *   n (IN) : length of Dx
+ *   Qm (IN) : the map Q computed by EquipartitionYAxis sorted 
+ *       in increasing order by Dx-values.
+ *   k_hat (IN) : maximum number of clumps 
+ *       Pm (IN): the map P. Pm must be a preallocated vector 
+ *       of size n. 
+ * Return
+ *   k : number of clumps in Pm.
  */
-void ApproxOptimizeXAxis(double *Dx, double *Dy, int n,
-			 int *Qm, int q, int *Pm, int p,
-			 int x, double *I)
+int GetSuperclumpsPartition(double *Dx, int n, int *Qm, int k_hat, int *Pm)
+{
+  int i, k, p;
+  double *Dp;
+  
+  /* compute clumps */
+  k = GetClumpsPartition(Dx, n, Qm, Pm);
+
+  if (k > k_hat) /* superclumps */
+    {
+      Dp = (double *) malloc (n * sizeof(double));
+      for (i=0; i<n; i++)
+	Dp[i] = (double) Pm[i];
+      p = EquipartitionYAxis(Dp, n, k_hat, Pm);
+      free(Dp);
+      return p;
+    }
+  else
+    return k;
+ }
+
+
+/* ApproxOptimizeXAxis
+ * Returns the map P: D -> {0, ...,k-1}. See Algorithm 2 in SOM.
+ * 
+ * Parameters
+ *   Dx (IN) : x-data sorted in increasing order by Dx-values
+ *   Dy (IN) : y-data sorted in increasing order by Dx-values
+ *   n (IN) : length of Dx and Dy
+ *   Qm (IN) : the map Q computed by EquipartitionYAxis sorted 
+ *   in increasing order by Dx-values.
+ *   q (IN) : number of clumps in Qm
+ *   Pm (IN) : the map P computed by GetSuperclumpsPartition 
+ *   sorted in increasing order by Dx-values.
+ *   p (IN) : number of clumps in Pm
+ *   x (IN) : grid size on x-values 
+ *   I (OUT) : the normalized mutual information vector. It 
+ *   will contain I_{k,2}, ..., I_{k, x}. I must be a 
+ *   preallocated array of dimension x-1.
+ */
+void ApproxOptimizeXAxis(double *Dx, double *Dy, int n, int *Qm, int q, 
+			 int *Pm, int p, int x, double *I)
 {
   int i, j, s, t, l;
-  int **N;
-  int *np, *c;
-  double **IM; // mutual information matrix, I_t,l
+  int **N; /* contains the number of samples for each cell Q x P*/
+  int *np; /* contains the number of samples for each cell P */
+  int *c; /* contains c_1, ..., c_k */
+  double **IM; /* mutual information matrix, I_t,l */
   double f, fmax, r1, r2;
   double hq;
   double **hpq2;
 
 
-  /* if Pk==1 return I=0 */
-  if (p <= 1)
+  /* if p==1 return I=0 */
+  if (p == 1)
     {
       for (i=0; i<x-1; i++)
 	I[i] = 0.0;
-      
       return;
     }
   
-  /* N matrix */
+  /* alloc the N matrix */
   N = (int **) malloc (q * sizeof(int *));
   for (i=0; i<q; i++)
     {
@@ -337,7 +409,7 @@ void ApproxOptimizeXAxis(double *Dx, double *Dy, int n,
 	N[i][j] = 0;
     }
   
-  /* np vector */
+  /* alloc the np vector */
   np = (int *) malloc (p * sizeof(int));
   for (j=0; j<p; j++)
     np[j] = 0;
@@ -349,13 +421,13 @@ void ApproxOptimizeXAxis(double *Dx, double *Dy, int n,
       np[Pm[i]] += 1;
     }
 
-  /* c_1, ..., c_k */
+  /* compute c_1, ..., c_k */
   c = (int *) malloc (p * sizeof(int));
   c[0] = np[0];
   for (i=1; i<p; i++)
     c[i] = np[i] + c[i-1];
- 
-  /* IM matrix */
+
+  /* alloc the IM matrix */
   IM = (double **) malloc ((p+1) * sizeof(double *));
   for (i=0; i<=p; i++)
     {
@@ -363,10 +435,12 @@ void ApproxOptimizeXAxis(double *Dx, double *Dy, int n,
       for (j=0; j<=x; j++)
 	IM[i][j] = 0.0;
     }
-
+  
+  /* compute H(Q)*/
   hq = HQ(N, q, p, n);
   
   /* Find the optimal partitions of size 2 */
+  /* Algorithm 2 in SOM, lines 4-8 */
   for (t=2; t<=p; t++)
     {
       fmax = -DBL_MAX;
@@ -394,6 +468,7 @@ void ApproxOptimizeXAxis(double *Dx, double *Dy, int n,
       hpq2[s][t] = HPQ2(N, np, q, p, s, t);
     
   /* inductively build the rest of the table of optimal partitions */
+  /* Algorithm 2 in SOM, lines 11-17 */
   for (l=3; l<=x; l++)
     for (t=l; t<=p; t++)
       {
@@ -412,7 +487,7 @@ void ApproxOptimizeXAxis(double *Dx, double *Dy, int n,
 	  }
       }
 
-  /* line 19 */
+  /* Algorithm 2 in SOM, line 19 */
   if (x > p)
     {
       for (i=p+1; i<=x; i++)
@@ -440,6 +515,7 @@ void ApproxOptimizeXAxis(double *Dx, double *Dy, int n,
   return;
 }
 
+/****** START QUICKSORT ******/
 
 void swap(double *x, int *idx, int i, int j)
 {
@@ -455,7 +531,7 @@ void swap(double *x, int *idx, int i, int j)
   idx[j] = idx_t;
 }
 
-
+/* sort x from index l to index u and idx according to x */
 void quicksort(double *x, int *idx, int l, int u)
 {
   int i, m;
@@ -472,8 +548,12 @@ void quicksort(double *x, int *idx, int l, int u)
   quicksort(x, idx, m+1, u);
 }
 
-
+/* sort
+ * Sort x and idx (of length n) according to x.
+ */
 void sort(double *x, int *idx, int n)
 {
   quicksort(x, idx, 0, n-1);
 }
+
+/****** END QUICKSORT ******/
