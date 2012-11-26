@@ -17,9 +17,9 @@
 Summary:
   \tabular{ll}{
   Package: \tab minerva\cr
-  Version: \tab 1.1\cr
-  Date: \tab 2012-10-15\cr
-  Require: \tab R >= (2.14.0)\cr
+  Version: \tab 1.2\cr
+  Date: \tab 2012-11-26\cr
+  Depends: \tab R >= (2.14.0)\cr
   Enshances: \tab parallel\cr
   URL: \tab http://www.r-project.org, \cr
   \tab http://mpba.fbk.eu/cmine, \cr
