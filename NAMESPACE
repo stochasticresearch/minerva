@@ -4,8 +4,4 @@ useDynLib(minerva)
 ## Export only the needed functions
 export(mine)
 
-
-## Import support for parallel computing
-if (as.numeric(R.version$major)>=2 && as.numeric(R.version$minor)>=14.0)
-  import(parallel)
-
+import(parallel)
