@@ -24,6 +24,32 @@
 #include <R.h>
 #include <Rinternals.h>
 
+double pearson(mine_problem *myprobl){
+  double r=0.0, xmean=0.0, ymean=0.0;
+  double sx=0.0, sy=0.0;
+  int i;
+  
+  for (i=0; i<myprobl->n; i++){
+    xmean += myprobl->x[i];
+    ymean += myprobl->y[i];
+  }
+  xmean /= myprobl->n;
+  ymean /= myprobl->n;
+  
+  for (i=0; i<myprobl->n; i++){
+    sx += (myprobl->x[i] - xmean) * (myprobl->x[i] - xmean);
+    sy += (myprobl->y[i] - ymean) * (myprobl->y[i] - ymean);
+  }
+  sx = sqrt((sx/myprobl->n));
+  sy = sqrt((sy/myprobl->n));
+  
+  for (i=0; i<myprobl->n; i++)
+    r += (((myprobl->x[i] - xmean)/sx) * ((myprobl->y[i] - ymean)/sy));
+  
+  r /= myprobl->n;
+  return(r * r);
+}
+
 SEXP mineRonevar (SEXP x, SEXP y, SEXP alpha, SEXP C){
   
   double *restmp;
@@ -34,7 +60,7 @@ SEXP mineRonevar (SEXP x, SEXP y, SEXP alpha, SEXP C){
   
   PROTECT(alpha = coerceVector(alpha,REALSXP));
   PROTECT(C = coerceVector(C,INTSXP));
-  PROTECT(res=allocVector(REALSXP,4));
+  PROTECT(res=allocVector(REALSXP,5));
   restmp=REAL(res);
     
   param = (mine_parameter *) Calloc(1,mine_parameter);
@@ -51,6 +77,7 @@ SEXP mineRonevar (SEXP x, SEXP y, SEXP alpha, SEXP C){
   restmp[1]=mas(minescore);
   restmp[2]=mev(minescore);
   restmp[3]=mcn(minescore);
+  restmp[4]=restmp[0] - pearson(prob);
   
   /* Free */
   Free(prob);
@@ -60,9 +87,6 @@ SEXP mineRonevar (SEXP x, SEXP y, SEXP alpha, SEXP C){
   return(res);
 }
 
-
-
-
 SEXP mineRall (SEXP x, SEXP nrx, SEXP ncx, SEXP alpha, SEXP C)
 {
   R_len_t i, j, rx, cx;
@@ -71,7 +95,7 @@ SEXP mineRall (SEXP x, SEXP nrx, SEXP ncx, SEXP alpha, SEXP C)
   mine_problem *prob;
   mine_parameter *param;
   mine_score *minescore;
-  SEXP res, mydim, resmic, resmas, resmev, resmcn, names;
+  SEXP res, mydim, resmic, resmas, resmev, resmcn, resmicmr, names;
   
   param = (mine_parameter *) Calloc(1,mine_parameter);
   param->alpha=asReal(alpha);
@@ -95,13 +119,15 @@ SEXP mineRall (SEXP x, SEXP nrx, SEXP ncx, SEXP alpha, SEXP C)
   PROTECT(resmas=allocVector(REALSXP,cx*cx));
   PROTECT(resmev=allocVector(REALSXP,cx*cx));
   PROTECT(resmcn=allocVector(REALSXP,cx*cx));
-  PROTECT(res=allocVector(VECSXP,4));
+  PROTECT(resmicmr=allocVector(REALSXP,cx*cx));
+  PROTECT(res=allocVector(VECSXP,5));
   
   /* Allocating result list */
   SET_VECTOR_ELT(res, 0, resmic);
   SET_VECTOR_ELT(res, 1, resmas);
   SET_VECTOR_ELT(res, 2, resmev);
   SET_VECTOR_ELT(res, 3, resmcn);
+  SET_VECTOR_ELT(res, 4, resmicmr);
   
   /* Set the mine_problem */
   prob = (mine_problem *) Calloc(1,mine_problem);
@@ -116,7 +142,11 @@ SEXP mineRall (SEXP x, SEXP nrx, SEXP ncx, SEXP alpha, SEXP C)
       score=mic(minescore);
       REAL(resmic)[(cx*j) + i] = score;
       REAL(resmic)[(cx*i) + j] = score;
-
+						
+      score-=pearson(prob);
+      REAL(resmicmr)[(cx*j) + i] = score;
+      REAL(resmicmr)[(cx*i) + j] = score;
+      
       score=mas(minescore);
       REAL(resmas)[(cx*j) + i] = score;
       REAL(resmas)[(cx*i) + j] = score;
@@ -128,7 +158,7 @@ SEXP mineRall (SEXP x, SEXP nrx, SEXP ncx, SEXP alpha, SEXP C)
       score=mcn(minescore);
       REAL(resmcn)[(cx*j) + i] = score;
       REAL(resmcn)[(cx*i) + j] = score;
-      
+            
       /* Free score */
       mine_free_score(&minescore);
     }
@@ -143,16 +173,18 @@ SEXP mineRall (SEXP x, SEXP nrx, SEXP ncx, SEXP alpha, SEXP C)
   setAttrib(resmas, R_DimSymbol, mydim);
   setAttrib(resmev, R_DimSymbol, mydim);
   setAttrib(resmcn, R_DimSymbol, mydim);
-
-  PROTECT(names=allocVector(STRSXP,4));
+  setAttrib(resmicmr, R_DimSymbol, mydim);
+  
+  PROTECT(names=allocVector(STRSXP,5));
   SET_STRING_ELT(names,0,mkChar("MIC"));
   SET_STRING_ELT(names,1,mkChar("MAS"));  
   SET_STRING_ELT(names,2,mkChar("MEV"));  
   SET_STRING_ELT(names,3,mkChar("MCN"));
+  SET_STRING_ELT(names,4,mkChar("MICR2"));
   setAttrib(res, R_NamesSymbol,names);
   
   /* Free memeory */
-  UNPROTECT(8);
+  UNPROTECT(9);
   Free(pointers);
   Free(param);
   Free(prob);

@@ -1,4 +1,4 @@
-## This code is written by Michele Filosi  <michele.filosi@gmail.com>
+# This code is written by Michele Filosi  <michele.filosi@gmail.com>
 ## Roberto Visintainer <r.visintainer@gmail.com>.
 ## 2012 
 
@@ -35,13 +35,14 @@ mine <- function(x, y=NULL, master=NULL, alpha=0.6, C=15, n.cores=1, var.thr=1e-
       if (min(master)<1)
         stop("Subscript out of bound!\nMinimum value allowed: ",1)
     }
-    if (is.null(master))
-      if (n.cores>1)
+    if (is.null(master)){
+      if (n.cores>1){
         ## Launch parallel
         return(.allvsallparall(x,alpha,C,n.cores))
-      else
+      } else{
         return(.allvsall(x,alpha,C))
-    else {
+      }
+    } else {
       if (length(master)==1){
         if (n.cores>1){
           return(.onevsallparall(x,master,alpha,C,n.cores))
@@ -60,10 +61,10 @@ mine <- function(x, y=NULL, master=NULL, alpha=0.6, C=15, n.cores=1, var.thr=1e-
       }
     }
   } else {
-    ## two masters given
+    ## two variables given
     if (ncol(x) == 1 && ncol(y) == 1){
       res <- .Call("mineRonevar",as.double(x),as.double(y),alpha=alpha,C=C)
-      names(res) <- c("MIC","MAS","MEV","MCN")
+      names(res) <- c("MIC","MAS","MEV","MCN","MIC-R2")
       return(as.list(res))
     } else {
       newdata <- cbind(x,y)
@@ -177,17 +178,19 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr) {
   Mat2 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
   Mat3 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
   Mat4 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
+  Mat5 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
+  
   for (i in start:f){
     res <- .Call("mineRonevar",as.double(x[,idx]),as.double(x[,i]),alpha=alpha,C=C,package="mineR")
-    names(res) <- c("MIC","MAS","MEV","MCN")
+    names(res) <- c("MIC","MAS","MEV","MCN","MIC-R2")
     Mat1[i,1] <- res["MIC"]
     Mat2[i,1] <- res["MAS"]
     Mat3[i,1] <- res["MEV"]
     Mat4[i,1] <- res["MCN"]
+    Mat5[i,1] <- res["MIC-R2"]
   }
-  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4))
+  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5))
 }
-
 
 ## Parallel implementation of one vs all function
 ## NB using 'parallel' package from CRAN for R >= 2.14
@@ -203,13 +206,16 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr) {
   Mat2 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
   Mat3 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
   Mat4 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
+  Mat5 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
+
   for (i in 1:f){
     Mat1[i,1] <- res[[i]][1]
     Mat2[i,1] <- res[[i]][2]
     Mat3[i,1] <- res[[i]][3]
     Mat4[i,1] <- res[[i]][4]
+    Mat5[i,1] <- res[[i]][5]
   }
-  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4))
+  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5))
 }
 
 ## Parallel implementation of all vs all function
@@ -218,17 +224,16 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr) {
 .allvsallparall <- function(x, alpha, C, n.cores){
   f <- dim(x)[2]
   cl <- makeCluster(n.cores)
-  ## res <- mclapply(1:f,function(y,data,alpha,C){return(.onevsall(x=data,idx=y,alpha=alpha,C=C,exclude=FALSE,diagonal=TRUE))
-  ##                                            },data=x,alpha=alpha,C=C,mc.cores=n.cores)
   res <- parLapply(cl,1:f,function(y,data,alpha,C){return(.onevsall(x=data,idx=y,alpha=alpha,C=C,exclude=FALSE,diagonal=TRUE))
                                              },data=x,alpha=alpha,C=C)
-
+  
   stopCluster(cl)
   Mat1 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
   Mat2 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
   Mat3 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
   Mat4 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
-
+  Mat5 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
+  
   for (i in seq(length(res))){
 
     Mat1[i,i:f] <- res[[i]][[1]][i:f,]
@@ -242,29 +247,33 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr) {
     
     Mat4[i,i:f] <- res[[i]][[4]][i:f,]
     Mat4[i:f,i] <- res[[i]][[4]][i:f,]
+
+    Mat5[i,i:f] <- res[[i]][[5]][i:f,]
+    Mat5[i:f,i] <- res[[i]][[5]][i:f,]
+    
   }
-  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4))
+  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5))
 }
 
 
 ## Just internal function for testing
-.allvsall_Rcycle <- function(x, alpha, C){
-  f <- dim(x)[2]
+## .allvsall_Rcycle <- function(x, alpha, C){
+##   f <- dim(x)[2]
   
-  Mat1 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
-  Mat2 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
-  Mat3 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
-  Mat4 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
-  for (i in 1:f){
-    for (j in 1:i){
-      res <- .Call("mineRonevar",as.double(x[,i]),as.double(x[,j]),alpha=alpha,C=C,package="mineR")
-      names(res) <- c("MIC","MAS","MEV","MCN")
-      Mat1[i,j] <- Mat1[j,i] <- res["MIC"]
-      Mat2[i,j] <- Mat2[j,i] <- res["MAS"]
-      Mat3[i,j] <- Mat3[j,i] <- res["MEV"]
-      Mat4[i,j] <- Mat4[j,i] <- res["MCN"]
-    }
-  }
+##   Mat1 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
+##   Mat2 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
+##   Mat3 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
+##   Mat4 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
+##   for (i in 1:f){
+##     for (j in 1:i){
+##       res <- .Call("mineRonevar",as.double(x[,i]),as.double(x[,j]),alpha=alpha,C=C,package="mineR")
+##       names(res) <- c("MIC","MAS","MEV","MCN")
+##       Mat1[i,j] <- Mat1[j,i] <- res["MIC"]
+##       Mat2[i,j] <- Mat2[j,i] <- res["MAS"]
+##       Mat3[i,j] <- Mat3[j,i] <- res["MEV"]
+##       Mat4[i,j] <- Mat4[j,i] <- res["MCN"]
+##     }
+##   }
   
-  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4))
-}
+##   return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4))
+## }

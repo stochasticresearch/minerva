@@ -10,6 +10,8 @@
 \alias{mev}
 \alias{MCN}
 \alias{mcn}
+\alias{MIC-R2}
+\alias{mic-r2}
 \title{MINE family statistics}
 \description{Maximal Information-Based Nonparametric Exploration (MINE) 
 statistics. \code{mine} computes the MINE family measures between two variables. 
@@ -94,7 +96,7 @@ obtain a solution closer to the theoretical one.
 \value{The Maximal Information-Based Nonparametric Exploration (MINE) statistics 
   provide quantitative evaluations of different aspects of the relationship 
   between two variables. 
-  In particular \code{mine} returns a list of 4 statistics: 
+  In particular \code{mine} returns a list of 5 statistics: 
   \item{MIC}{ \strong{Maximal Information Coefficient.} \cr 
     It is related to the relationship strenght and it can be interpreted as a 
     correlation measure. It is symmetric and it ranges in [0,1], where it 
@@ -111,17 +113,19 @@ obtain a solution closer to the theoretical one.
     \eqn{\textrm{MEV} \leq \textrm{MIC}}{MEV <= MIC}. }
   \item{MCN}{ \strong{Minimum Cell Number.} \cr 
     It is a complexity measure. }
-\cr
-    When computing \code{mine} between two numeric vectors \code{x} and \code{y}, 
-    the output is a list of 4 numeric values. When \code{master} is provided, 
-    \code{mine} returns a list of 4 matrices having \code{ncol} equal to 
-    \emph{m}. In particular, if \code{master} is a single value, 
-    then \code{mine} returns a list of 4 matrices having 1 column, 
-    whose rows correspond to the MINE measures between the \emph{master} 
-    column versus all. Instead if \code{master} is a vector of \emph{m} indices,
-    then \code{mine} output is a list of 4 \emph{m-by-m} matrices, whose element 
-    \emph{i,j} corresponds to the MINE statistics computed between the \emph{i} 
-    and \emph{j} columns of \code{x}.
+  \item{MIC-R2}{It is the difference between the MIC value and the Pearson
+    correlation coefficient. } \cr
+
+  When computing \code{mine} between two numeric vectors \code{x} and \code{y}, 
+  the output is a list of 5 numeric values. When \code{master} is provided, 
+  \code{mine} returns a list of 5 matrices having \code{ncol} equal to 
+  \emph{m}. In particular, if \code{master} is a single value, 
+  then \code{mine} returns a list of 5 matrices having 1 column, 
+  whose rows correspond to the MINE measures between the \emph{master} 
+  column versus all. Instead if \code{master} is a vector of \emph{m} indices,
+  then \code{mine} output is a list of 5 \emph{m-by-m} matrices, whose element 
+  \emph{i,j} corresponds to the MINE statistics computed between the \emph{i} 
+  and \emph{j} columns of \code{x}.
 }
 \references{
   D. Reshef, Y. Reshef, H. Finucane, S. Grossman, G. McVean, P. Turnbaugh, 
@@ -154,6 +158,7 @@ mine(x,y)
 # MAS = 0
 # MEV = 1
 # MCN = 2
+# MIC-R2 = 0
 
 set.seed(100); x <- runif(10); y <- 3*x+2+rnorm(10,mean=2,sd=5); plot(x,y)
 mine(x,y)
@@ -162,6 +167,7 @@ mine(x,y)
 # MAS = 0
 # MEV = 0.61
 # MCN = 2
+# MIC-R2 = 0.13
 
 t <-seq(-2*pi,2*pi,0.2); y1 <- sin(2*t); plot(t,y1,type="l")
 mine(t,y1)
@@ -170,6 +176,7 @@ mine(t,y1)
 # MAS = 0.37
 # MEV = 0.66
 # MCN = 3.58
+# MIC-R2 = 0.62
 
 y2 <- sin(4*t); plot(t,y2,type="l")
 mine(t,y2)
@@ -178,6 +185,7 @@ mine(t,y2)
 # MAS = 0.18
 # MEV = 0.32
 # MCN = 3.58
+# MIC-R2 = 0.31
 
 # Note that for small n it is better to increase alpha
 mine(t,y1,alpha=1)
@@ -186,6 +194,7 @@ mine(t,y1,alpha=1)
 # MAS = 0.59
 # MEV = 1
 # MCN = 5.67
+# MIC-R2 = 0.96
 
 mine(t,y2,alpha=1)
 # rounded values of MINE statistics
@@ -193,7 +202,7 @@ mine(t,y2,alpha=1)
 # MAS = 0.59
 # MEV = 1
 # MCN = 5
-
+# MIC-R2 = 0.99
 
 # Some examples from SOM
 x <- runif(n=1000, min=0, max=1)
@@ -204,6 +213,7 @@ y1 <- x; plot(x,y1,type="l"); mine(x,y1)
 # MAS = 0
 # MEV = 1
 # MCN = 4
+# MIC-R2 = 0
 
 # Parabolic relationship
 y2 <- 4*(x-0.5)^2; plot(sort(x),y2[order(x)],type="l"); mine(x,y2)
@@ -212,6 +222,7 @@ y2 <- 4*(x-0.5)^2; plot(sort(x),y2[order(x)],type="l"); mine(x,y2)
 # MAS = 0.68
 # MEV = 1
 # MCN = 5.5
+# MIC-R2 = 1
 
 # Sinusoidal relationship (varying frequency)
 y3 <- sin(6*pi*x*(1+x)); plot(sort(x),y3[order(x)],type="l"); mine(x,y3)
@@ -220,6 +231,7 @@ y3 <- sin(6*pi*x*(1+x)); plot(sort(x),y3[order(x)],type="l"); mine(x,y3)
 # MAS = 0.85
 # MEV = 1
 # MCN = 4.6
+# MIC-R2 = 0.96
 
 # Circle relationship
 t <- seq(from=0,to=2*pi,length.out=1000)
@@ -230,6 +242,7 @@ mine(x4,y4)
 # MAS = 0.01
 # MEV = 0.32
 # MCN = 5.98
+# MIC-R2 = 0.68
 
 data(Spellman)
 Spellman <- as.matrix(Spellman)
