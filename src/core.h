@@ -19,7 +19,7 @@ void sort(double *x, int *idx, int n);
  * Return
  *   q : the real value of y. It can be < y.
  */
-int EquipartitionYAxis(double *Dy, int n, int y, int *Qm);
+int EquipartitionYAxis(const double *Dy, int n, int y, int *Qm);
 
 
 /* GetSuperclumpsPartition
@@ -36,7 +36,7 @@ int EquipartitionYAxis(double *Dy, int n, int y, int *Qm);
  * Return
  *   k : number of clumps in Pm.
  */
-int GetSuperclumpsPartition(double *Dx, int n, int *Qm, 
+int GetSuperclumpsPartition(const double *Dx, int n, const int *Qm, 
 			    int k_hat, int *Pm);
 
 
@@ -58,6 +58,6 @@ int GetSuperclumpsPartition(double *Dx, int n, int *Qm,
  *       will contain I_{k,2}, ..., I_{k, x}. I must be a 
  *       preallocated array of dimension x-1.
  */
-void ApproxOptimizeXAxis(double *Dx, double *Dy, int n, 
-			 int *Qm, int q, int *Pm, int p, 
+void ApproxOptimizeXAxis(const double *Dx, const double *Dy, int n, 
+			 const int *Qm, int q, const int *Pm, int p, 
 			 int x, double *I);
