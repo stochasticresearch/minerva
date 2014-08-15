@@ -1,1 +1,0 @@
-java -jar MINE.jar Spellman.csv 0
