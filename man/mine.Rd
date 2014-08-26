@@ -10,15 +10,14 @@
 \alias{mev}
 \alias{MCN}
 \alias{mcn}
-\alias{MCN_GENERAL}
-\alias{mcn_general}
 \alias{MIC-R2}
 \alias{mic-r2}
 \title{MINE family statistics}
 \description{Maximal Information-Based Nonparametric Exploration (MINE) 
 statistics. \code{mine} computes the MINE family measures between two variables. 
 }
-\usage{mine(x, y=NULL, master=NULL, alpha=0.6, C=15, eps=0, n.cores=1, var.thr=1e-5)}
+\usage{mine(x, y=NULL, master=NULL, alpha=0.6, C=15, n.cores=1,
+var.thr=1e-5, eps=NULL, ...)}
 \arguments{
   \item{x}{ a numeric vector (of size \emph{n}), matrix or data frame (which is coerced 
     to matrix). }
@@ -36,8 +35,6 @@ statistics. \code{mine} computes the MINE family measures between two variables.
     \emph{X-by-Y} search-grid. When trying to partition the \emph{x}-axis into 
     \emph{X} columns, the algorithm will start with at most \code{C}\emph{X} 
     \emph{clumps}. Default value is 15 (see Details). }
-  \item{eps}{an optional parameter for the MCN measure. Default value is
-    0 (see Details).  }
   \item{n.cores}{ optional number of cores to be used in the
     computations, when master is specified. It requires the
     \pkg{parallel} package, which provides support for parallel 
@@ -47,6 +44,11 @@ statistics. \code{mine} computes the MINE family measures between two variables.
     variables, since \code{mine} can not be computed in case of variance
     close to 0. Default value is 1e-5. Information about failed check
     are reported in \emph{var_thr.log} file. }
+  \item{eps}{ integer in [0,1].  If 'NULL' (default) it is set to
+    1-MIC. It can be set to zero for noiseless functions,
+    but the default choice is the most appropriate parametrization
+    for general cases (as stated in Reshef et al. SOM).
+    It provides robustness. }
 \item{\dots}{ currently not used. }
 } 
 \details{\code{mine} is an R wrapper for the C engine \emph{cmine} 
@@ -249,10 +251,8 @@ mine(x4,y4)
 # MIC-R2 = 0.68
 
 data(Spellman)
-Spellman <- as.matrix(Spellman)
 res <- mine(Spellman,master=1,n.cores=1)
 
 \dontrun{## example of multicore computation
-require(parallel)
 res <- mine(Spellman,master=1,n.cores=parallel::detectCores()-1)}
 }

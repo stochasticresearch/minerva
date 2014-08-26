@@ -15,15 +15,17 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
-mine <- function(x, y=NULL, master=NULL, alpha=0.6, C=15, eps=0, n.cores=1, var.thr=1e-5){
-  checked <- check.inputs(x, y, alpha, C, eps, n.cores,var.thr)
+mine <- function(x, y=NULL, master=NULL, alpha=0.6, C=15, n.cores=1, var.thr=1e-5, eps=NULL, ...){
+  ## Input controls
+  checked <- check.inputs(x,y,alpha,C,n.cores,var.thr,eps)
   x <- checked[[1]]
   y <- checked[[2]]
   alpha <- checked[[3]]
   C <- checked[[4]]
-  eps <- checked[[5]]
-  n.cores <- checked[[6]]
+  n.cores <- checked[[5]]
+  eps <- checked[[6]]
+  var.idx <- checked[[7]]
+  
   ## only one matrix given
   if (is.null(y)){
     s <- dim(x)[1]
@@ -37,45 +39,72 @@ mine <- function(x, y=NULL, master=NULL, alpha=0.6, C=15, eps=0, n.cores=1, var.
         stop("Subscript out of bound!\nMinimum value allowed: ",1)
     }
     if (is.null(master)){
-      mynames <- colnames(x)
       if (n.cores>1){
         ## Launch parallel
-        ## tmp <- .allvsallparall(x,alpha,C,n.cores)
-        return(.allvsallparall(x, alpha, C, eps, n.cores))
+        res <- .allvsallparall(x,alpha,C,n.cores,eps)
+        ## return(.allvsallparall(x,alpha,C,n.cores,eps))
       } else{
-        ## tmp <- .allvsall(x,alpha,C)
-        return(.allvsall(x,alpha,C, eps))
+        res <- .allvsall(x,alpha,C,eps)
+        ## return(.allvsall(x,alpha,C,eps))
       }
     } else {
       if (length(master)==1){
         if (n.cores>1){
-          return(.onevsallparall(x, master, alpha, C, eps, n.cores))
+          res <- .onevsallparall(x,master,alpha,C,n.cores,eps)
+          ## return(.onevsallparall(x,master,alpha,C,n.cores,eps))
         }
         else{
-          return(.onevsall(x, master, alpha, C, eps, exclude=FALSE))
+          res <- .onevsall(x,master,alpha,C,exclude=FALSE,eps)
+          ## return(.onevsall(x,master,alpha,C,exclude=FALSE,eps))
         }
       }
       if (length(master)>1){
         newdata <- x[,master]
-        if (n.cores>1)
+        if (n.cores>1){
           ## Launch parallel
-          return(.allvsallparall(newdata, alpha, C, eps, n.cores))
-        else
-          return(.allvsall(newdata, alpha, C, eps))
+          res <- .allvsallparall(newdata,alpha,C,n.cores,eps)
+          ## return(.allvsallparall(newdata,alpha,C,n.cores,eps))
+        } else {
+          res <- .allvsall(newdata,alpha,C,eps)
+          ## return(.allvsall(newdata,alpha,C,eps))
+        }
       }
     }
   } else {
     ## two variables given
     if (ncol(x) == 1 && ncol(y) == 1){
-      res <- .Call("mineRonevar", as.double(x), as.double(y), alpha=alpha, C=C, EPS=eps)
-      names(res) <- c("MIC","MAS","MEV","MCN","MCN_GENERAL", "MIC-R2")
-      return(as.list(res))
+      res <- .Call("mineRonevar",as.double(x),as.double(y),alpha=alpha,C=C,eps=eps)
+      names(res) <- c("MIC","MAS","MEV","MCN","MIC-R2")
+      res <- as.list(res)
+      ## return(as.list(res))
     } else {
       newdata <- cbind(x,y)
       colnames(newdata)[ncol(newdata)] <- "Y"
-      return(.onevsall(newdata, ncol(newdata), alpha, C, eps, exclude=TRUE))
+      res <- .onevsall(newdata,ncol(newdata),alpha,C,exclude=TRUE,eps)
+      ## return(.onevsall(newdata,ncol(newdata),alpha,C,exclude=TRUE,eps))
     }
   }
+  ## Set NA variables with nearly 0 variance
+  if (!is.null(var.idx))
+    res <- lapply(res,
+                  function(x,var.idx){
+                    if(is.null(dim(x))){
+                      x <- 0.0
+                    } else {
+                      if (length(master)==1) {
+                        if (any(var.idx==master)){
+                          x[,1] <- 0.0
+                        } else {
+                          x[var.idx,] <- 0.0
+                        }
+                      } else {
+                        x[var.idx,] <- x[,var.idx] <- 0.0
+                      }
+                    }
+                    return(x)},
+                  var.idx=var.idx)
+  
+  return(res)
 }
 
 ##--------------------------------------------------
@@ -86,16 +115,13 @@ mine <- function(x, y=NULL, master=NULL, alpha=0.6, C=15, eps=0, n.cores=1, var.
 ## x should be a matrix or a vector
 ##   if x is a vector y should be given
 ## y should be a one dimensional vector
-check.inputs <- function(x, y, alpha, C, eps, n.cores,var.thr) {
+check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps) {
 
   ## MINE parameters check!
   if (alpha<=0.0 || alpha>1.0 || !is.numeric(alpha))
     stop("'alpha' must be in (0.0, 1.0]",call.=FALSE)
   if(C<=0.0 || !is.numeric(C))
     stop("'C' must be > 0.0",call.=FALSE)
-  if (eps<0.0 || !is.numeric(eps))
-    stop("'eps' must be > 0.0",call.=FALSE)
-
   
   ## Data check!
   if (is.data.frame(x))
@@ -110,10 +136,14 @@ check.inputs <- function(x, y, alpha, C, eps, n.cores,var.thr) {
     stop("'x' must be numeric", call.=FALSE)
   stopifnot(is.atomic(x))
   x <- as.matrix(x)
+
+  ## Check variance
+  ## NB modified to return NA -> check on the mine function
+  var.idx <- NULL
   if (sum(apply(x,2,var)<var.thr)!=0){
     var.idx <- which(apply(x,2,var)<var.thr)
-    write.table(var.idx,"var_thr_x.log",col.names=FALSE,row.names=FALSE,quote=FALSE,sep=",")
-    stop("Found columns having variance < ", var.thr,"; in 'x';\nread file var_thr_x.log for more information.\n")
+    ## write.table(var.idx,"var_thr_x.log",col.names=FALSE,row.names=FALSE,quote=FALSE,sep=",")
+    ## stop("Found columns having variance < ", var.thr,"; in 'x';\nread file var_thr_x.log for more information.\n")
   }
   if (!is.null(y)) {
     if (!is.numeric(y))
@@ -124,8 +154,10 @@ check.inputs <- function(x, y, alpha, C, eps, n.cores,var.thr) {
       nas <- sum(is.na(y))
       stop(nas," NAs found in 'y', please, consider imputing or remove them.", call.=FALSE)
     }
+    ## NB remove the following comments to get back to the previous version
     if (var(y)<var.thr)
-      stop("'y' has variance < ", var.thr,"\n")
+      var.idx <- 1
+      ## stop("'y' has variance < ", var.thr,"\n")
     
     if (dim(y)[2] != 1)
       stop("'y' must be a 1-dimensional object", call.=FALSE)
@@ -134,7 +166,6 @@ check.inputs <- function(x, y, alpha, C, eps, n.cores,var.thr) {
   }
 
   ## Parallel computation check!
-  
   if (!is.numeric(n.cores))
     stop("'n.cores' must be numeric")
 
@@ -158,25 +189,32 @@ check.inputs <- function(x, y, alpha, C, eps, n.cores,var.thr) {
     stop("You are trying to compute mic using ",n.cores," cores.. are you sure?", call.=FALSE)
   }
   
-  return(list(x, y, alpha, C, eps, n.cores))
+  if(!is.null(eps)){
+    if( eps<0.0 || eps>1 || !is.numeric(eps) )
+      stop("'eps' must be > 0.0 and < 1.0",call.=FALSE)
+  }  
+
+  if (!is.null(var.idx)){
+    warning("Found variables with nearly 0 variance")
+  }
+  
+  return(list(x, y, alpha, C, n.cores, eps, var.idx))
 }
 
 
 ## Calling all features vs all features using C implementation
 ## For the source see src/mine_interface.c
-.allvsall <- function(x, alpha, C, eps){
+.allvsall <- function(x, alpha, C,eps){
   tmp <- .Call("mineRall",x,nrow(x),ncol(x),alpha,C, eps)
-  print(tmp)
   tmp <- lapply(tmp,function(y,n){colnames(y) <- rownames(y) <- n
-                                 return(y)}, n <- colnames(x))
-  ## return(.Call("mineRall",x,nrow(x),ncol(x),alpha,C))
+                                  return(y)}, n <- colnames(x))
   return(tmp)
 }
 
 ## Calling feature x[,idx] vs all other features
 ## Using C implementation feature vs feature
 ## For the source see src/mine_interface.c
-.onevsall <- function(x, idx, alpha, C, eps, exclude, diagonal=FALSE){
+.onevsall <- function(x,idx,alpha,C,eps,exclude,diagonal=FALSE){
   if (exclude)
     f <- dim(x)[2]-1
   else
@@ -191,29 +229,30 @@ check.inputs <- function(x, y, alpha, C, eps, n.cores,var.thr) {
   Mat3 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
   Mat4 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
   Mat5 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
-  Mat6 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
   
   for (i in start:f){
-    res <- .Call("mineRonevar",as.double(x[,idx]),as.double(x[,i]), alpha=alpha, C=C, EPS=eps, package="minerva")
-    names(res) <- c("MIC", "MAS", "MEV", "MCN", "MCN_GENERAL", "MIC-R2")
+    res <- .Call("mineRonevar",as.double(x[,idx]),as.double(x[,i]),
+                 alpha=alpha,C=C,eps=eps,package="minerva")
+    names(res) <- c("MIC","MAS","MEV","MCN","MIC-R2")
     Mat1[i,1] <- res["MIC"]
     Mat2[i,1] <- res["MAS"]
     Mat3[i,1] <- res["MEV"]
     Mat4[i,1] <- res["MCN"]
-    Mat5[i,1] <- res["MCN_GENERAL"]
-    Mat6[i,1] <- res["MIC-R2"]
+    Mat5[i,1] <- res["MIC-R2"]
   }
-  return(list(MIC=Mat1, MAS=Mat2, MEV=Mat3, MCN=Mat4, MCN_GENERAL=Mat5, MICR2=Mat6))
+  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5))
 }
 
 ## Parallel implementation of one vs all function
 ## NB using 'parallel' package from CRAN for R >= 2.14
 ## If older version of R install multicore package
-.onevsallparall <- function(x, master, alpha, C, eps, n.cores){
+.onevsallparall <- function(x,master,alpha,C,n.cores,eps){
   f <- dim(x)[2]
   cl <- makeCluster(n.cores)
-  res <- parLapply(cl,1:f,function(i, master, alpha, C, eps, data){return(.Call("mineRonevar",as.double(data[,master]),as.double(data[,i]), alpha=alpha, C=C, EPS=eps, package="minerva"))}
-                   , master=master, alpha=alpha, C=C, eps=eps, data=x)
+  res <- parLapply(cl,1:f,function(i,master,alpha,C,data,eps){
+    return(.Call("mineRonevar",as.double(data[,master]),
+                 as.double(data[,i]),alpha=alpha,C=C,eps=eps,package="minerva"))},
+                   master=master,alpha=alpha,C=C,eps=eps,data=x)
   stopCluster(cl)
   
   Mat1 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
@@ -221,7 +260,6 @@ check.inputs <- function(x, y, alpha, C, eps, n.cores,var.thr) {
   Mat3 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
   Mat4 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
   Mat5 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
-  Mat6 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
 
   for (i in 1:f){
     Mat1[i,1] <- res[[i]][1]
@@ -229,19 +267,19 @@ check.inputs <- function(x, y, alpha, C, eps, n.cores,var.thr) {
     Mat3[i,1] <- res[[i]][3]
     Mat4[i,1] <- res[[i]][4]
     Mat5[i,1] <- res[[i]][5]
-    Mat6[i,1] <- res[[i]][6]
   }
-  return(list(MIC=Mat1, MAS=Mat2, MEV=Mat3, MCN=Mat4, MCN_GENERAL=Mat5, MICR2=Mat6))
+  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5))
 }
 
 ## Parallel implementation of all vs all function
 ## NB using 'parallel' package from CRAN for R >= 2.14
 ## If older version of R install multicore package
-.allvsallparall <- function(x, alpha, C, eps, n.cores){
+.allvsallparall <- function(x, alpha, C, n.cores,eps){
   f <- dim(x)[2]
   cl <- makeCluster(n.cores)
-  res <- parLapply(cl,1:f,function(y, data, alpha, C, eps){return(.onevsall(x=data, idx=y, alpha=alpha, C=C, eps=eps, exclude=FALSE, diagonal=TRUE))
-                                             }, data=x, alpha=alpha, C=C, eps=eps)
+  res <- parLapply(cl,1:f,function(y,data,alpha,C,eps){
+    return(.onevsall(x=data,idx=y,alpha=alpha,C=C,eps=eps,exclude=FALSE,diagonal=TRUE))},
+                   data=x,alpha=alpha,C=C,eps=eps)
   
   stopCluster(cl)
   Mat1 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
@@ -249,7 +287,6 @@ check.inputs <- function(x, y, alpha, C, eps, n.cores,var.thr) {
   Mat3 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
   Mat4 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
   Mat5 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
-  Mat6 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
   
   for (i in seq(length(res))){
 
@@ -267,33 +304,7 @@ check.inputs <- function(x, y, alpha, C, eps, n.cores,var.thr) {
 
     Mat5[i,i:f] <- res[[i]][[5]][i:f,]
     Mat5[i:f,i] <- res[[i]][[5]][i:f,]
-
-    Mat6[i,i:f] <- res[[i]][[5]][i:f,]
-    Mat6[i:f,i] <- res[[i]][[5]][i:f,]
     
   }
-  return(list(MIC=Mat1, MAS=Mat2, MEV=Mat3, MCN=Mat4, MCN_GENERAL=Mat5, MICR2=Mat6))
+  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5))
 }
-
-
-## Just internal function for testing
-## .allvsall_Rcycle <- function(x, alpha, C){
-##   f <- dim(x)[2]
-  
-##   Mat1 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
-##   Mat2 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
-##   Mat3 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
-##   Mat4 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
-##   for (i in 1:f){
-##     for (j in 1:i){
-##       res <- .Call("mineRonevar",as.double(x[,i]),as.double(x[,j]),alpha=alpha,C=C,package="mineR")
-##       names(res) <- c("MIC","MAS","MEV","MCN")
-##       Mat1[i,j] <- Mat1[j,i] <- res["MIC"]
-##       Mat2[i,j] <- Mat2[j,i] <- res["MAS"]
-##       Mat3[i,j] <- Mat3[j,i] <- res["MEV"]
-##       Mat4[i,j] <- Mat4[j,i] <- res["MCN"]
-##     }
-##   }
-  
-##   return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4))
-## }
