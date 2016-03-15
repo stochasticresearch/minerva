@@ -15,9 +15,11 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mine <- function(x, y=NULL, master=NULL, alpha=0.6, C=15, n.cores=1, var.thr=1e-5, eps=NULL, ...){
-  ## Input controls
-  checked <- check.inputs(x,y,alpha,C,n.cores,var.thr,eps)
+mine <- function(x, y=NULL, master=NULL, alpha=0.6, C=15, n.cores=1, var.thr=1e-5, eps=NULL, na.rm=FALSE, use="all.obs", ...){
+
+
+  ## Control on input arguments
+  checked <- check.inputs(x,y,alpha,C,n.cores,var.thr,eps, na.rm, use)
   x <- checked[[1]]
   y <- checked[[2]]
   alpha <- checked[[3]]
@@ -25,11 +27,21 @@ mine <- function(x, y=NULL, master=NULL, alpha=0.6, C=15, n.cores=1, var.thr=1e-
   n.cores <- checked[[5]]
   eps <- checked[[6]]
   var.idx <- checked[[7]]
+  na.rm <- checked[[8]]
+  use <- checked[[9]]
   
   ## only one matrix given
   if (is.null(y)){
     s <- dim(x)[1]
     f <- dim(x)[2]
+
+    ## Check for na and overwrite the input
+    ## No need to store the input
+    if (na.rm | use %in% c(2L, 3L)){
+      x <- na.omit(x)
+    }
+    
+    ## If a master variable is passed check the type
     if (!is.null(master)){
       if (!is.numeric(master))
         stop("'master' must be numeric")
@@ -70,22 +82,32 @@ mine <- function(x, y=NULL, master=NULL, alpha=0.6, C=15, n.cores=1, var.thr=1e-
         }
       }
     }
-  } else {
+  } else { ## y is given
+
+    ## pairwise.complete.obs // complete.obs
+    if (na.rm | use%in% c(2L,3L)){
+      xidx <- (apply(!is.na(x), 1, sum))
+      yidx <- !is.na(y)
+      idx <- xidx & yidx
+      x <- as.matrix(x[idx,])
+      y <- as.matrix(y[idx,])
+    }
+    
     ## two variables given
-    if (ncol(x) == 1 && ncol(y) == 1){
+    if (ncol(x) == 1 & ncol(y) == 1){
       res <- .Call("mineRonevar",as.double(x),as.double(y),alpha=alpha,C=C,eps=eps)
-      names(res) <- c("MIC","MAS","MEV","MCN","MIC-R2")
+      names(res) <- c("MIC","MAS","MEV","MCN","MIC-R2", "GMIC", "TIC")
       res <- as.list(res)
-      ## return(as.list(res))
     } else {
       newdata <- cbind(x,y)
       colnames(newdata)[ncol(newdata)] <- "Y"
       res <- .onevsall(newdata,ncol(newdata),alpha,C,exclude=TRUE,eps)
-      ## return(.onevsall(newdata,ncol(newdata),alpha,C,exclude=TRUE,eps))
     }
   }
+  
   ## Set NA variables with nearly 0 variance
-  if (!is.null(var.idx))
+  ## TODO: set NA with nearly 0 variance when y is passed as arguments
+  if (!is.null(var.idx[["x"]]))
     res <- lapply(res,
                   function(x,var.idx){
                     if(is.null(dim(x))){
@@ -102,33 +124,41 @@ mine <- function(x, y=NULL, master=NULL, alpha=0.6, C=15, n.cores=1, var.thr=1e-
                       }
                     }
                     return(x)},
-                  var.idx=var.idx)
-  
+                  var.idx=var.idx[["x"]])
+
+  ## Return results
   return(res)
 }
 
 ##--------------------------------------------------
-## Function for internal use!
+## Functions for internal use!
 ##--------------------------------------------------
 
 ## Checking input integrity
 ## x should be a matrix or a vector
 ##   if x is a vector y should be given
 ## y should be a one dimensional vector
-check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps) {
+check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps,na.rm,use) {
 
   ## MINE parameters check!
   if (alpha<=0.0 || alpha>1.0 || !is.numeric(alpha))
     stop("'alpha' must be in (0.0, 1.0]",call.=FALSE)
   if(C<=0.0 || !is.numeric(C))
     stop("'C' must be > 0.0",call.=FALSE)
+
+  ## use argument
+  na.method <- pmatch(use, c("all.obs", "complete.obs", "pairwise.complete.obs", 
+                             "everything"))
+  if (is.na(na.method))
+    stop("invalid 'use' argument")
   
   ## Data check!
   if (is.data.frame(x))
     x <- as.matrix(x)
-  if (any(is.na(x))){
-    nas <- sum(is.na(x))
-    stop(nas," NAs found in 'x', please, consider imputing or remove them.", call.=FALSE)
+
+  ## Check for NA/missing values
+  if (any(is.na(x)) & !(na.rm | na.method %in% c(2L,3L))){
+    stop("Missing values present in input variable 'x'. Consider using use = 'pairwise.complete.obs'.", call.=FALSE)
   }
   if (!is.matrix(x) && is.null(y))
     stop("supply both 'x' and 'y' or a matrix-like 'x'", call.=FALSE)
@@ -138,34 +168,37 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps) {
   x <- as.matrix(x)
 
   ## Check variance
-  ## NB modified to return NA -> check on the mine function
-  var.idx <- NULL
-  if (sum(apply(x,2,var)<var.thr)!=0){
-    var.idx <- which(apply(x,2,var)<var.thr)
-    ## write.table(var.idx,"var_thr_x.log",col.names=FALSE,row.names=FALSE,quote=FALSE,sep=",")
-    ## stop("Found columns having variance < ", var.thr,"; in 'x';\nread file var_thr_x.log for more information.\n")
-  }
+  var.idx <- list()
+  myvar <- apply(x,2,var,na.rm=TRUE)
+  if (sum(myvar<var.thr)!=0)
+    var.idx[["x"]] <- which(myvar<var.thr)
+  
+  ## y not empty
   if (!is.null(y)) {
     if (!is.numeric(y))
       stop("'y' must be numeric", call.=FALSE)
     stopifnot(is.atomic(y))
     y <- as.matrix(y)
-    if (any(is.na(y))){
-      nas <- sum(is.na(y))
-      stop(nas," NAs found in 'y', please, consider imputing or remove them.", call.=FALSE)
+
+    ## Check for NA/missing values
+    if (any(is.na(y)) & !(na.rm | na.method %in% c(2L,3L))){
+      stop("Missing values present in input variable 'y'. Consider using use = 'pairwise.complete.obs'.", call.=FALSE)
     }
-    ## NB remove the following comments to get back to the previous version
-    if (var(y)<var.thr)
-      var.idx <- 1
-      ## stop("'y' has variance < ", var.thr,"\n")
     
+    ## Check variance on argument y
+    if (var(y, na.rm=TRUE)<var.thr)
+      var.idx[["y"]] <- c(var.idx,1)
+
+    ## Control dimensions of y
     if (dim(y)[2] != 1)
       stop("'y' must be a 1-dimensional object", call.=FALSE)
+
+    ## Consistency check between x and y
     if (nrow(y) != nrow(x))
       stop ("'x' and 'y': incompatible dimensions", call.=FALSE)
   }
-
-  ## Parallel computation check!
+  
+  ## Check for parallel computing
   if (!is.numeric(n.cores))
     stop("'n.cores' must be numeric")
 
@@ -176,7 +209,6 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps) {
   }
   
   if (n.cores > 1){
-    
     if (detectCores()==1){
       warning("Only 1 core available on this machine:'n.cores' will be ignored.\nPlease consider using a cluster.",
               immediate.=TRUE)
@@ -189,16 +221,22 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps) {
     stop("You are trying to compute mic using ",n.cores," cores.. are you sure?", call.=FALSE)
   }
   
+  ## Check epsilon parameter for MINE
   if(!is.null(eps)){
     if( eps<0.0 || eps>1 || !is.numeric(eps) )
       stop("'eps' must be > 0.0 and < 1.0",call.=FALSE)
   }  
 
-  if (!is.null(var.idx)){
+  ## Send a warning if variable with 0 variance have been found
+  if (!is.null(var.idx[["x"]]) || !is.null(var.idx[["y"]])){
     warning("Found variables with nearly 0 variance")
   }
+
+  ## Check if na.rm is a boolean or a integer
+  if (length(na.rm)>1 || (!is.logical(na.rm) && !is.integer(na.rm)))
+    na.rm <- FALSE
   
-  return(list(x, y, alpha, C, n.cores, eps, var.idx))
+  return(list(x, y, alpha, C, n.cores, eps, var.idx, na.rm, na.method))
 }
 
 
@@ -229,18 +267,22 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps) {
   Mat3 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
   Mat4 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
   Mat5 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
+  Mat6 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
+  Mat7 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[idx]))
   
   for (i in start:f){
     res <- .Call("mineRonevar",as.double(x[,idx]),as.double(x[,i]),
                  alpha=alpha,C=C,eps=eps,package="minerva")
-    names(res) <- c("MIC","MAS","MEV","MCN","MIC-R2")
+    names(res) <- c("MIC","MAS","MEV","MCN","MIC-R2", "GMIC", "TIC")
     Mat1[i,1] <- res["MIC"]
     Mat2[i,1] <- res["MAS"]
     Mat3[i,1] <- res["MEV"]
     Mat4[i,1] <- res["MCN"]
     Mat5[i,1] <- res["MIC-R2"]
+    Mat6[i,1] <- res["GMIC"]
+    Mat7[i,1] <- res["TIC"]
   }
-  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5))
+  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5,GMIC=Mat6, TIC=Mat7))
 }
 
 ## Parallel implementation of one vs all function
@@ -260,15 +302,19 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps) {
   Mat3 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
   Mat4 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
   Mat5 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
-
+  Mat6 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
+  Mat7 <- matrix(0,nrow=f,ncol=1,dimnames=list(colnames(x)[1:f],colnames(x)[master]))
+  
   for (i in 1:f){
     Mat1[i,1] <- res[[i]][1]
     Mat2[i,1] <- res[[i]][2]
     Mat3[i,1] <- res[[i]][3]
     Mat4[i,1] <- res[[i]][4]
     Mat5[i,1] <- res[[i]][5]
+    Mat6[i,1] <- res[[i]][6]
+    Mat7[i,1] <- res[[i]][7]
   }
-  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5))
+  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5,GMIC=Mat6,TIC=Mat7))
 }
 
 ## Parallel implementation of all vs all function
@@ -287,6 +333,8 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps) {
   Mat3 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
   Mat4 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
   Mat5 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
+  Mat6 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
+  Mat7 <- matrix(0,ncol=f,nrow=f,dimnames=list(colnames(x),colnames(x)))
   
   for (i in seq(length(res))){
 
@@ -304,7 +352,13 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps) {
 
     Mat5[i,i:f] <- res[[i]][[5]][i:f,]
     Mat5[i:f,i] <- res[[i]][[5]][i:f,]
-    
+
+    Mat6[i,i:f] <- res[[i]][[6]][i:f,]
+    Mat6[i:f,i] <- res[[i]][[6]][i:f,]
+
+    Mat7[i,i:f] <- res[[i]][[7]][i:f,]
+    Mat7[i:f,i] <- res[[i]][[7]][i:f,]
+
   }
-  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5))
+  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5,GMIC=Mat6,TIC=Mat7))
 }

@@ -1,8 +1,8 @@
 Package: minerva
-Version: 1.4.1
-Date: 2014-08-26
-Title: minerva: Maximal Information-Based Nonparametric Exploration R
-        package for Variable Analysis
+Version: 1.4.5
+Date: 2016-03-14
+Title: Maximal Information-Based Nonparametric Exploration R Package
+        for Variable Analysis
 Authors@R: c(person("Michele", "Filosi", role = c("aut","cre" ), email
         = "filosi@fbk.eu"), person("Roberto", "Visintainer", role =
         "aut", email = "visintainer@fbk.eu"), person("Davide",
@@ -13,17 +13,18 @@ Authors@R: c(person("Michele", "Filosi", role = c("aut","cre" ), email
         role = "ctb", email = "furlan@fbk.eu"))
 Depends: R (>= 2.14.0)
 Imports: parallel
-Description: R wrapper for cmine implementation of Maximal
+Description: R wrapper for 'cmine' implementation of Maximal
         Information-based Nonparametric Exploration statistics (MIC and
-        MINE family)
-URL: http://www.r-project.org, http://mpba.fbk.eu/cmine,
-        http://minepy.sourceforge.net, http://www.exploredata.net
+        MINE family). Detailed information of the ANSI C implementation 'cmine'
+	can be found at 'http://mpba.fbk.eu/cmine'.
+URL: http://mpba.fbk.eu/cmine, http://minepy.sourceforge.net,
+        http://www.exploredata.net, http://www.r-project.org
 License: GPL-3
-Packaged: 2014-08-26 14:14:39 UTC; michele
+Packaged: 2016-03-14 17:08:02 UTC; michele
 Author: Michele Filosi [aut, cre], Roberto Visintainer [aut], Davide
         Albanese [aut], Samantha Riccadonna [ctb], Giuseppe Jurman
         [ctb], Cesare Furlanello [ctb]
 Maintainer: Michele Filosi <filosi@fbk.eu>
 Repository: CRAN
-Date/Publication: 2014-08-26 18:12:19
 NeedsCompilation: yes
+Date/Publication: 2016-03-15 00:07:13
