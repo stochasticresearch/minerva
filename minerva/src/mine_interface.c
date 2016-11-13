@@ -67,6 +67,7 @@ SEXP mineRonevar (SEXP x, SEXP y, SEXP alpha, SEXP C, SEXP eps){
   param = (mine_parameter *) Calloc(1,mine_parameter);
   param->alpha=asReal(alpha);
   param->c=asReal(C);
+  param->est=EST_MIC_E;
   
   prob = (mine_problem *) Calloc(1,mine_problem);
   prob->n=length(x);
@@ -110,6 +111,7 @@ SEXP mineRall (SEXP x, SEXP nrx, SEXP ncx, SEXP alpha, SEXP C, SEXP eps)
   param = (mine_parameter *) Calloc(1,mine_parameter);
   param->alpha=asReal(alpha);
   param->c=asReal(C);
+  param->est=EST_MIC_E;
   
   /* Matrix dimension */
   rx=asInteger(nrx);
