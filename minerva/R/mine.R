@@ -96,7 +96,7 @@ mine <- function(x, y=NULL, master=NULL, alpha=0.6, C=15, n.cores=1, var.thr=1e-
     ## two variables given
     if (ncol(x) == 1 & ncol(y) == 1){
       res <- .Call("mineRonevar",as.double(x),as.double(y),alpha=alpha,C=C,eps=eps)
-      names(res) <- c("MIC","MAS","MEV","MCN","MIC-R2", "GMIC", "TIC")
+      names(res) <- c("MICe","MAS","MEV","MCN","MIC-R2", "GMIC", "TIC")
       res <- as.list(res)
     } else {
       newdata <- cbind(x,y)
@@ -273,8 +273,8 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps,na.rm,use) {
   for (i in start:f){
     res <- .Call("mineRonevar",as.double(x[,idx]),as.double(x[,i]),
                  alpha=alpha,C=C,eps=eps,package="minerva")
-    names(res) <- c("MIC","MAS","MEV","MCN","MIC-R2", "GMIC", "TIC")
-    Mat1[i,1] <- res["MIC"]
+    names(res) <- c("MICe","MAS","MEV","MCN","MIC-R2", "GMIC", "TIC")
+    Mat1[i,1] <- res["MICe"]
     Mat2[i,1] <- res["MAS"]
     Mat3[i,1] <- res["MEV"]
     Mat4[i,1] <- res["MCN"]
@@ -282,7 +282,7 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps,na.rm,use) {
     Mat6[i,1] <- res["GMIC"]
     Mat7[i,1] <- res["TIC"]
   }
-  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5,GMIC=Mat6, TIC=Mat7))
+  return(list(MICe=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5,GMIC=Mat6, TIC=Mat7))
 }
 
 ## Parallel implementation of one vs all function
@@ -314,7 +314,7 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps,na.rm,use) {
     Mat6[i,1] <- res[[i]][6]
     Mat7[i,1] <- res[[i]][7]
   }
-  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5,GMIC=Mat6,TIC=Mat7))
+  return(list(MICe=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5,GMIC=Mat6,TIC=Mat7))
 }
 
 ## Parallel implementation of all vs all function
@@ -360,5 +360,5 @@ check.inputs <- function(x,y,alpha,C,n.cores,var.thr,eps,na.rm,use) {
     Mat7[i:f,i] <- res[[i]][[7]][i:f,]
 
   }
-  return(list(MIC=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5,GMIC=Mat6,TIC=Mat7))
+  return(list(MICe=Mat1,MAS=Mat2,MEV=Mat3,MCN=Mat4,MICR2=Mat5,GMIC=Mat6,TIC=Mat7))
 }
